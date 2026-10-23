@@ -489,8 +489,22 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
+  const intellisenseListeners = new Map<string, Set<(payload: any) => void>>();
+  const intellisenseEvents = {
+    on(name: string, fn: (payload: any) => void) {
+      const set = intellisenseListeners.get(name) ?? new Set();
+      set.add(fn);
+      intellisenseListeners.set(name, set);
+      return () => set.delete(fn);
+    },
+    emit(name: string, payload: any) {
+      for (const fn of intellisenseListeners.get(name) ?? []) fn(payload);
+    }
+  };
+
   transcriptFocus(
     {
+      events: intellisenseEvents,
       on(event: string, handler: Handler) {
         handlers.set(event, handler);
       },
@@ -621,6 +635,7 @@ function createHarness(options: HarnessOptions = {}) {
   };
 
   return {
+    intellisenseEvents,
     copiedTexts,
     editor,
     editorInputs,
@@ -1740,4 +1755,32 @@ test("non-fullscreen mode leaves the focus key available to Pi silently", () => 
   assert.equal(regular.input("\t"), undefined);
   assert.deepEqual(regular.notifications, []);
   assert.equal(regular.statuses.get("pi-tab-focus"), undefined);
+});
+
+test("native IntelliSense from existing transcript visual cursor dispatches K and gd", async () => {
+  const h = createHarness();
+  const calls: Array<{ operation: string; snapshot: any }> = [];
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session",
+    extensionId: "pi-intellisense",
+    actions: ["hover", "definition", "references"],
+    async invoke(operation: string, snapshot: any) {
+      calls.push({ operation, snapshot });
+    }
+  });
+  h.input("\t");
+  h.input("v");
+  h.input("K");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].operation, "hover");
+  assert.equal(typeof calls[0].snapshot.renderedLine, "string");
+  assert.ok(calls[0].snapshot.screenCursor.row >= 0);
+  h.input("g");
+  h.input("d");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].operation, "definition");
+  h.shutdown();
 });
