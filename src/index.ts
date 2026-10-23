@@ -121,6 +121,7 @@ export default function transcriptFocus(
     let exReturnCheck: ReturnType<typeof setTimeout> | undefined;
     let visualNavigation: VimVisualNavigation | undefined;
     let visualWidth: number | undefined;
+    let intellisenseFocusEpoch = 0;
 
     const activeScrollView = (): PrivateScrollView | undefined =>
       fullscreenLayout.activeScrollView();
@@ -399,6 +400,8 @@ export default function transcriptFocus(
       if (options.restoreGutter && head) syncSelectionToVisualHead(1);
       visualNavigation = undefined;
       visualWidth = undefined;
+      intellisensePending = false;
+      intellisenseFocusEpoch++;
       clearNativeTextSelection();
       if (options.restoreGutter) {
         const selected = selectedItemFrom(transcriptItems());
@@ -450,7 +453,9 @@ export default function transcriptFocus(
     handleTranscriptSnapshotChange = (change) => {
       if (change.contentChanged || change.originChanged) {
         invalidateVisualSource();
+        intellisenseFocusEpoch++;
       }
+      if (change.geometryChanged) intellisenseFocusEpoch++;
       if (tui?.mode !== "fullscreen" || (!focused && !exDetour)) return;
 
       const items = transcriptItems();
@@ -476,6 +481,7 @@ export default function transcriptFocus(
       }
 
       focused = next;
+      intellisenseFocusEpoch++;
 
       // Transcript focus is real TUI focus, not just an input-routing flag.
       // Removing focus from the editor suppresses its CURSOR_MARKER, so Pi hides
@@ -782,6 +788,7 @@ export default function transcriptFocus(
       if (!after) return;
       const comparison = compareVimPoints(after, before);
       if (comparison !== 0) {
+        intellisenseFocusEpoch++;
         syncSelectionToVisualHead(comparison > 0 ? 1 : -1);
         revealVisualHead();
       }
@@ -887,6 +894,11 @@ export default function transcriptFocus(
       const screenRow = head.row - scroll.scrollTop;
       if (screenRow < 0 || screenRow >= (tui?.terminal.rows ?? 0)) return;
       const screenCol = Math.max(0, head.col + 1); // transcript left gutter
+      const focusEpoch = intellisenseFocusEpoch;
+      const itemKey = item.semanticKey;
+      const renderRevision = visualSourceRevision;
+      const layoutWidth = transcriptWidth();
+      const scrollTopAtInvocation = scroll.scrollTop;
       const snapshot = {
         version: 1 as const,
         sessionId: intellisenseSessionId,
@@ -898,6 +910,20 @@ export default function transcriptFocus(
         screenCursor: { row: screenRow, col: screenCol },
         selectedCodeRegionId: item.semanticKey,
         sourceSpans: [],
+        isCurrent: () => {
+          const currentHead = visualSnapshot()?.head;
+          const currentScroll = activeScrollView();
+          const currentItem = currentHead && transcriptItems().find(
+            candidate => currentHead.row >= candidate.startRow && currentHead.row < candidate.endRow
+          );
+          return focused && inVisualMode() && !exDetour &&
+            intellisenseFocusEpoch === focusEpoch &&
+            visualSourceRevision === renderRevision &&
+            transcriptWidth() === layoutWidth &&
+            currentItem?.semanticKey === itemKey &&
+            currentHead?.row === head.row && currentHead?.col === head.col &&
+            currentScroll?.scrollTop === scrollTopAtInvocation;
+        },
         itemText: item.text,
         renderedLine: sourceLine(head.row),
         itemStartRow: item.startRow,
@@ -1200,7 +1226,14 @@ export default function transcriptFocus(
       return undefined;
     });
 
+    const unsubscribeReturnToEditor = pi.events?.on?.("pi-intellisense:return-to-editor:v1", (payload: any) => {
+      if (payload?.sessionId !== intellisenseSessionId || !focused) return;
+      if (inVisualMode()) finishVisualMode({ restoreGutter: false });
+      leaveTranscriptMode();
+    });
+
     cleanupSession = () => {
+      unsubscribeReturnToEditor?.();
       unsubscribeTerminalInput();
 
       if (exReturnCheck !== undefined) {

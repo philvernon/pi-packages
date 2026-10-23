@@ -1784,3 +1784,56 @@ test("native IntelliSense from existing transcript visual cursor dispatches K an
   assert.equal(calls[1].operation, "definition");
   h.shutdown();
 });
+
+test("intellisense hover Tab event returns to editor and invalidates late source snapshot", async () => {
+  const h = createHarness();
+  let snapshot: any;
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["hover"],
+    async invoke(_operation: string, captured: any) { snapshot = captured; }
+  });
+  h.input("\t");
+  h.input("v");
+  h.input("K");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshot?.isCurrent(), true);
+  h.intellisenseEvents.emit("pi-intellisense:return-to-editor:v1", {sessionId:"pi-session"});
+  assert.equal(snapshot.isCurrent(), false, "late hover cannot reopen after returning to editor");
+  assert.equal(h.focusedComponent, h.installedEditor);
+  h.input("x");
+  assert.ok(h.editorInputs.includes("x"), "keyboard input reaches editor again");
+  h.shutdown();
+});
+
+test("leaving transcript clears pending IntelliSense g prefix on next entry", async () => {
+  const h=createHarness();
+  const calls: string[]=[];
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1",{
+    sessionId:"pi-session",extensionId:"pi-intellisense",actions:["hover","definition"],
+    async invoke(operation:string){calls.push(operation);}
+  });
+  h.input("\t");h.input("v");h.input("g");
+  h.input("\t"); // back to editor
+  h.input("\t");h.input("v");h.input("K");
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["hover"]);
+  h.shutdown();
+});
+
+test("pending hover snapshot invalidates when transcript scrolls away", async () => {
+  const h=createHarness();
+  let snapshot:any;
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1",{
+    sessionId:"pi-session",extensionId:"pi-intellisense",actions:["hover"],
+    async invoke(_operation:string,s:any){snapshot=s;}
+  });
+  h.input("\t");h.input("v");h.input("K");
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(snapshot?.isCurrent(),true);
+  h.privateScrollView.scrollTop += 1;
+  assert.equal(snapshot.isCurrent(),false);
+  h.shutdown();
+});

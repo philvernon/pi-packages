@@ -83,3 +83,12 @@ npm run typecheck
 npm test
 npm pack --dry-run
 ```
+## Optional native Pi IntelliSense bridge (source checkout)
+
+The source checkout on GitHub main includes an experimental, session-scoped Pi event-bus bridge for [pi-intellisense](https://github.com/philvernon/pi-intellisense). The original transcript remains owned by pi-tab-focus. While its visual cursor is active on code, `K` delegates hover and `gd` delegates definition; item-level uppercase `K`, all legacy motions and yank remain unchanged.
+
+The bridge exposes `isCurrent()` on focus snapshots to suppress stale LSP responses after mode/cursor/layout changes. A capturing IntelliSense hover popup uses `Esc` to close and remain in transcript mode, or `Tab` to close and signal `pi-intellisense:return-to-editor:v1`, restoring the prompt editor. Pending `g` prefixes are cleared when leaving visual mode.
+
+The npm release may not yet include this patch; when developing locally, run Pi with `-e /path/to/pi-tab-focus/src/index.ts -e /path/to/pi-intellisense/src/index.ts` and avoid loading a second installed copy of the tab-focus extension. The integration does not enable semantic mapping by itself: use the pi-intellisense provider/provenance configuration and see its docs.
+
+The bridge dispatch and focus transitions are covered by local automated tests, but its long wrapped-code and full Sidekick/tmux integration remain areas for further testing.
