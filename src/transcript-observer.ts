@@ -22,6 +22,9 @@ export type TranscriptItem = {
   gutterEndRow: number;
   text: string;
   linkSourceLines: string[];
+  sourceText?: string;
+  toolCallId?: string;
+  renderedStartRow: number;
 };
 
 export type TranscriptSnapshotChange = {
@@ -48,6 +51,7 @@ type TranscriptMount = {
 type ObservedEntry = {
   component: Component;
   kind: TranscriptItemKind | undefined;
+  sourceText?: string;
   lines: string[];
   startRow: number;
 };
@@ -156,6 +160,13 @@ function semanticItemBaseKey(
   }
 
   return `${kind}:${hashText(text)}`;
+}
+
+function originalMessageText(component: Component, kind: TranscriptItemKind): string | undefined {
+  if (kind !== "message") return undefined;
+  const message = (component as {lastMessage?: {content?: Array<{type: string; text?: string}>}}).lastMessage;
+  if (!Array.isArray(message?.content)) return undefined;
+  return message.content.filter(part => part.type === "text").map(part => part.text ?? "").join("\n");
 }
 
 function findTranscriptMountIn(
@@ -350,6 +361,7 @@ export class TranscriptRenderObserver {
     this.absoluteItems = this.relativeItems.map((item) => ({
       ...item,
       startRow: this.transcriptStartRow + item.startRow,
+      renderedStartRow: this.transcriptStartRow + item.renderedStartRow,
       endRow: this.transcriptStartRow + item.endRow,
       gutterStartRow: this.transcriptStartRow + item.gutterStartRow,
       gutterEndRow: this.transcriptStartRow + item.gutterEndRow,
@@ -467,6 +479,7 @@ export class TranscriptRenderObserver {
       nextEntries.push({
         component: child,
         kind: transcriptItemKind(child),
+        sourceText: originalMessageText(child, transcriptItemKind(child) ?? "custom"),
         lines,
         startRow: row,
       });
@@ -482,7 +495,7 @@ export class TranscriptRenderObserver {
       structureChanged ||
       previousEntries.some((entry, index) => {
         const next = nextEntries[index];
-        return !next || !linesEqual(entry.lines, next.lines);
+        return !next || entry.sourceText !== next.sourceText || !linesEqual(entry.lines, next.lines);
       });
 
     this.entries = nextEntries;
@@ -547,6 +560,9 @@ export class TranscriptRenderObserver {
             : endRow,
         text,
         linkSourceLines: entry.lines,
+        renderedStartRow: entry.startRow,
+        sourceText: entry.sourceText,
+        toolCallId: kind === "tool" ? (entry.component as {toolCallId?: string}).toolCallId : undefined,
       });
     }
 

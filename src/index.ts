@@ -122,6 +122,8 @@ export default function transcriptFocus(
     let visualNavigation: VimVisualNavigation | undefined;
     let visualWidth: number | undefined;
     let intellisenseFocusEpoch = 0;
+    let intellisenseIntentEpoch = 0;
+    let intellisensePickerDepth = 0;
 
     const activeScrollView = (): PrivateScrollView | undefined =>
       fullscreenLayout.activeScrollView();
@@ -402,6 +404,7 @@ export default function transcriptFocus(
       visualWidth = undefined;
       intellisensePending = false;
       intellisenseFocusEpoch++;
+      intellisenseIntentEpoch++;
       clearNativeTextSelection();
       if (options.restoreGutter) {
         const selected = selectedItemFrom(transcriptItems());
@@ -482,6 +485,7 @@ export default function transcriptFocus(
 
       focused = next;
       intellisenseFocusEpoch++;
+      intellisenseIntentEpoch++;
 
       // Transcript focus is real TUI focus, not just an input-routing flag.
       // Removing focus from the editor suppresses its CURSOR_MARKER, so Pi hides
@@ -895,6 +899,7 @@ export default function transcriptFocus(
       if (screenRow < 0 || screenRow >= (tui?.terminal.rows ?? 0)) return;
       const screenCol = Math.max(0, head.col + 1); // transcript left gutter
       const focusEpoch = intellisenseFocusEpoch;
+      const intentEpoch = intellisenseIntentEpoch;
       const itemKey = item.semanticKey;
       const renderRevision = visualSourceRevision;
       const layoutWidth = transcriptWidth();
@@ -917,6 +922,8 @@ export default function transcriptFocus(
             candidate => currentHead.row >= candidate.startRow && currentHead.row < candidate.endRow
           );
           return focused && inVisualMode() && !exDetour &&
+            (!transientUiHasFocus() || intellisensePickerDepth > 0) &&
+            intellisenseIntentEpoch === intentEpoch &&
             intellisenseFocusEpoch === focusEpoch &&
             visualSourceRevision === renderRevision &&
             transcriptWidth() === layoutWidth &&
@@ -924,11 +931,27 @@ export default function transcriptFocus(
             currentHead?.row === head.row && currentHead?.col === head.col &&
             currentScroll?.scrollTop === scrollTopAtInvocation;
         },
+        // Opening an editor split changes layout without changing the user's navigation intent.
+        isNavigationCurrent: () => {
+          const currentItem = transcriptItems().find(candidate => candidate.key === item.key);
+          return focused && inVisualMode() && !exDetour &&
+            (!transientUiHasFocus() || intellisensePickerDepth > 0) &&
+            intellisenseIntentEpoch === intentEpoch && currentItem !== undefined &&
+            currentItem.sourceText === item.sourceText && currentItem.toolCallId === item.toolCallId;
+        },
+        withNavigationPicker: async <T>(run: () => Promise<T>): Promise<T> => {
+          intellisensePickerDepth++;
+          try { return await run(); }
+          finally { intellisensePickerDepth--; }
+        },
         itemText: item.text,
         renderedLine: sourceLine(head.row),
         itemStartRow: item.startRow,
         itemEndRow: item.endRow,
         renderedLines: [...item.linkSourceLines],
+        renderedStartRow: item.renderedStartRow,
+        sourceText: item.sourceText,
+        toolCallId: item.toolCallId,
       };
       void Promise.resolve(handler.invoke(operation, snapshot)).catch((error: unknown) => {
         ctx.ui.notify("IntelliSense: " + (error instanceof Error ? error.message : String(error)), "warning");
@@ -937,6 +960,7 @@ export default function transcriptFocus(
 
     const handleVisualInput = (data: string): boolean => {
       if (!visualNavigation || !ensureVisualWidth()) return false;
+      intellisenseIntentEpoch++;
 
       const semanticKey = normalizeVisualKey(data);
       const handler = intellisenseHandler?.sessionId === intellisenseSessionId
@@ -1038,6 +1062,7 @@ export default function transcriptFocus(
       // When another Pi/custom component has actual TUI focus, it owns input.
       // This covers select/confirm/input/editor prompts and capturing overlays.
       if (transientUiHasFocus()) {
+        if (intellisensePickerDepth === 0 && !isKeyRelease(data)) intellisenseIntentEpoch++;
         if (exDetour) checkExReturnAfterInput();
         return undefined;
       }

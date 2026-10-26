@@ -143,8 +143,10 @@ class UserMessageComponent extends FakeText {
 }
 
 class AssistantMessageComponent extends FakeText {
+  lastMessage: {content: Array<{type: string; text: string}>};
   constructor(text?: string) {
     super(text ? [` ${text}`] : []);
+    this.lastMessage = {content: [{type: "text", text: text ?? ""}]};
   }
 }
 
@@ -636,6 +638,9 @@ function createHarness(options: HarnessOptions = {}) {
 
   return {
     intellisenseEvents,
+    setDoneSourceText(text: string) {
+      transcript.done.lastMessage = {content: [{type: "text", text}]};
+    },
     copiedTexts,
     editor,
     editorInputs,
@@ -1776,6 +1781,8 @@ test("native IntelliSense from existing transcript visual cursor dispatches K an
   assert.equal(calls.length, 1);
   assert.equal(calls[0].operation, "hover");
   assert.equal(typeof calls[0].snapshot.renderedLine, "string");
+  assert.equal(calls[0].snapshot.sourceText, "Done. Edited file");
+  assert.ok(Number.isInteger(calls[0].snapshot.renderedStartRow));
   assert.ok(calls[0].snapshot.screenCursor.row >= 0);
   h.input("g");
   h.input("d");
@@ -1835,5 +1842,117 @@ test("pending hover snapshot invalidates when transcript scrolls away", async ()
   assert.equal(snapshot?.isCurrent(),true);
   h.privateScrollView.scrollTop += 1;
   assert.equal(snapshot.isCurrent(),false);
+  h.shutdown();
+});
+
+test("hidden source annotation changes invalidate snapshots even when rendering is unchanged", async () => {
+  const h = createHarness();
+  let snapshot: any;
+  const original = '```ts source="src/a.ts" lines="1"\nstate();\n```';
+  h.setDoneSourceText(original);
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["hover"],
+    async invoke(_operation: string, captured: any) { snapshot = captured; }
+  });
+  h.input("\t"); h.input("v"); h.input("K");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshot.sourceText, original);
+  assert.equal(snapshot.isCurrent(), true);
+  h.setDoneSourceText(original.replace('lines="1"', 'lines="2"'));
+  h.renderFrame();
+  assert.equal(snapshot.isCurrent(), false);
+  h.shutdown();
+});
+
+test("source snapshot carries the exact tool-call identity rather than matching result text", async () => {
+  const h = createHarness();
+  let snapshot: any;
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["hover"],
+    async invoke(_operation: string, captured: any) { snapshot = captured; }
+  });
+  h.input("\t"); h.input("K"); h.input("v"); h.input("K");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshot.itemKind, "tool");
+  assert.equal(snapshot.toolCallId, "tool-edit");
+  assert.equal(snapshot.sourceText, undefined);
+  h.shutdown();
+});
+
+test("navigation intent survives layout-only changes but not subsequent input or changed source", async () => {
+  const h = createHarness();
+  let snapshot: any;
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["definition"],
+    async invoke(_operation: string, captured: any) { snapshot = captured; }
+  });
+  h.input("\t"); h.input("v"); h.input("g"); h.input("d");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshot.isNavigationCurrent(), true);
+  h.privateScrollView.scrollTo(h.privateScrollView.scrollTop - 1); h.renderFrame();
+  assert.equal(snapshot.isCurrent(), false);
+  assert.equal(snapshot.isNavigationCurrent(), true);
+  h.setDoneSourceText("different source"); h.renderFrame();
+  assert.equal(snapshot.isNavigationCurrent(), false);
+  h.input("l");
+  h.input("g"); h.input("d");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshot.isNavigationCurrent(), true);
+  h.input("l");
+  assert.equal(snapshot.isNavigationCurrent(), false);
+  h.shutdown();
+});
+
+for (const foreignInput of [false, true]) {
+  test(`foreign dialog ${foreignInput ? "input persistently invalidates" : "focus blocks"} IntelliSense snapshots`, async () => {
+    const h = createHarness();
+    let snapshot: any;
+    h.start();
+    h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+      sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["definition"],
+      async invoke(_operation: string, captured: any) { snapshot = captured; }
+    });
+    h.input("\t"); h.input("v"); h.input("g"); h.input("d");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(snapshot.isCurrent(), true);
+    assert.equal(snapshot.isNavigationCurrent(), true);
+    h.setFocusedComponent({ handleInput() {} });
+    assert.equal(snapshot.isCurrent(), false);
+    assert.equal(snapshot.isNavigationCurrent(), false);
+    if (foreignInput) h.input("x");
+    h.setFocusedComponent(null);
+    assert.equal(snapshot.isCurrent(), !foreignInput);
+    assert.equal(snapshot.isNavigationCurrent(), !foreignInput);
+    h.shutdown();
+  });
+}
+
+test("IntelliSense location picker input preserves strict and navigation currentness", async () => {
+  const h = createHarness();
+  let snapshot: any;
+  h.start();
+  h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+    sessionId: "pi-session", extensionId: "pi-intellisense", actions: ["definition"],
+    async invoke(_operation: string, captured: any) { snapshot = captured; }
+  });
+  h.input("\t"); h.input("v"); h.input("g"); h.input("d");
+  await new Promise(resolve => setImmediate(resolve));
+  const selected = await snapshot.withNavigationPicker(async () => {
+    h.setFocusedComponent({ handleInput() {} });
+    h.input("j"); h.input("\r");
+    assert.equal(snapshot.isCurrent(), true);
+    assert.equal(snapshot.isNavigationCurrent(), true);
+    h.setFocusedComponent(null);
+    return "selected target";
+  });
+  assert.equal(selected, "selected target");
+  assert.equal(snapshot.isCurrent(), true);
+  assert.equal(snapshot.isNavigationCurrent(), true);
+  h.setFocusedComponent({ handleInput() {} });
+  assert.equal(snapshot.isCurrent(), false, "picker exemption ends with wrapper");
+  assert.equal(snapshot.isNavigationCurrent(), false);
   h.shutdown();
 });
