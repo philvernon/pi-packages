@@ -6,20 +6,17 @@ Language-server hover and source navigation in the existing Pi transcript. With 
 
 ## Setup
 
-Requires Node **22.19+**, Pi **1.3.0**, a language server, and the source-aware bridge currently in `~/dev-trash/pi-tab-focus`. Published bridge compatibility is not assumed. Load each extension only once.
+Requires Node **22.19+**, Pi **1.3.0** and a language server. The [pi-packages repository](https://github.com/philvernon/pi-packages) bundles this extension with its source-aware `pi-tab-focus` bridge.
 
-From the workspace you want to inspect:
+Before switching, disable the old `npm:pi-tab-focus` entry and any standalone local copies in `pi config`, and stop passing their `-e` flags. Installing the bundle does not disable other sources; loading both creates two independent transcript focus owners.
 
-```sh
-pi -e ~/dev-trash/pi-tab-focus -e ~/dev/repos/pi-intellisense
-```
-
-For persistent loading, Pi's normal package mechanism writes package declarations to your settings:
+Install the bundle once:
 
 ```sh
-pi install ~/dev-trash/pi-tab-focus
-pi install ~/dev/repos/pi-intellisense
+pi install git:github.com/philvernon/pi-packages
 ```
+
+For local development, use `pi install /path/to/pi-packages` instead of the GitHub source. Do not enable both sources or add separate `-e` entries for either extension. If using `pi-vim`, keep it before the bundle in your package settings.
 
 Run normal Pi in fullscreen mode inside tmux. No wrapper or prestarted Neovim is required. Outside tmux, configure an existing Neovim socket. The extension itself does not install software or modify global configuration.
 
@@ -86,23 +83,21 @@ Language servers are queried directly over stdio. No `pi-tools`, Sidekick or Neo
 
 ## Development and verification
 
+From the repository root:
+
 ```sh
-npm run test:all             # unit + native, Node's built-in runner only
-npm run build                # strict src/test typecheck + entry import
-npm run test:integration     # real TS LSP and isolated tmux/Neovim
-
-# Enable all four real Pi terminal cases, offline with saved fixture sessions:
-PI_TAB_FOCUS_SOURCE=~/dev-trash/pi-tab-focus/src/index.ts npm run test:integration
-
-# Verify the actual keyboard owner separately:
-cd ~/dev-trash/pi-tab-focus
-npm test
-npm run typecheck
+npm run setup                # install each package's locked development dependencies
+npm run build                # both strict typechecks + IntelliSense entry import
+npm test                     # both packages' unit/native suites
+npm run test:integration      # real TS LSP and isolated Pi/tmux/Neovim
+npm run check                # build and every test suite
 ```
+
+Each package retains its own npm scripts and dependency lockfile. The real Pi tests load the root bundle, including the sibling `pi-tab-focus`, without an external bridge path.
 
 All tests and fixtures are TypeScript, included in `strict: true`, `noEmit: true` checking. Mocks use production dependency interfaces; incomplete Pi UI hosts are isolated at the test boundary. No test framework, transpiler, global formatter or runtime compilation dependency is added.
 
-Integration needs `pi`, `tmux`, `nvim` and `typescript-language-server` on `PATH`, workspace TypeScript, and the patched bridge path for transcript cases. Without `PI_TAB_FOCUS_SOURCE`, exactly four Pi-terminal tests skip; real LSP/tmux/Neovim tests still require their executables. Tests use offline fixture sessions, private configuration and separately named tmux servers, with no model requests. Cleanup targets only test-owned processes/files. Short `/tmp` paths keep Neovim Unix sockets within macOS length limits. Cold LSP requests can be slower under concurrent verification workloads.
+Integration needs `pi`, `tmux`, `nvim` and `typescript-language-server` on `PATH`, and workspace TypeScript. All four Pi-terminal cases run against the bundled bridge; none skip for a missing external bridge setting. Tests use offline fixture sessions, private configuration and separately named tmux servers, with no model requests. Cleanup targets only test-owned processes/files. Short `/tmp` paths keep Neovim Unix sockets within macOS length limits. Cold LSP requests can be slower under concurrent verification workloads.
 
 Passing tests verify the exercised fixtures, not universal transcript semantics or every host/server combination.
 

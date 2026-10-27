@@ -4,9 +4,13 @@ Crush-style transcript focus mode for Pi. Navigate, select and copy transcript c
 
 ## Install
 
+This repository bundles `pi-tab-focus` and `pi-intellisense`. Before switching, disable the old `npm:pi-tab-focus` entry and standalone local copies in `pi config`, and stop passing their `-e` flags. Loading both creates independent focus owners.
+
 ```sh
-pi install npm:pi-tab-focus
+pi install git:github.com/philvernon/pi-packages
 ```
+
+For local development, install `/path/to/pi-packages` instead of the GitHub source. Enable only one source; neither extension needs a separate `-e` entry. IntelliSense requires Pi **1.3.0** and a language server; see its [setup](../pi-intellisense/README.md#setup).
 
 Run Pi in fullscreen mode:
 
@@ -20,35 +24,35 @@ pi --tui-mode fullscreen
 
 ```sh
 pi install npm:pi-vim
-pi install npm:pi-tab-focus
+pi install git:github.com/philvernon/pi-packages
 ```
 
-The same ordering should be used in `settings.json`.
+Keep `pi-vim` before the `pi-packages` bundle in `settings.json`.
 
 ## Usage
 
 Press `Tab` to enter transcript focus. Press `Tab` or `Esc` to return to the editor.
 
-| Key | Action |
-| --- | --- |
-| `j` / `↓` | scroll down |
-| `k` / `↑` | scroll up |
-| `u` / `d` | half-page up / down |
-| `Shift+J` / `Shift+↓` | next transcript item |
-| `Shift+K` / `Shift+↑` | previous transcript item |
-| `b` / `PgUp` | page up |
-| `f` / `PgDn` | page down |
-| `g` / `Home` | top |
-| `G` / `End` | bottom |
-| `y` / `c` | copy selected item or visual selection |
-| `v` | visual cursor / character selection |
-| `V` | line selection |
-| `Enter` | open the first link in the selected item; in visual mode, open the link under the cursor |
-| `:` | open EX mode when using `pi-vim` |
-| `Ctrl+O` | toggle tool output |
-| `Ctrl+T` | toggle thinking visibility |
-| `Ctrl+C` | return to editor focus |
-| `Ctrl+D` | shut down Pi |
+| Key                   | Action                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `j` / `↓`             | scroll down                                                                              |
+| `k` / `↑`             | scroll up                                                                                |
+| `u` / `d`             | half-page up / down                                                                      |
+| `Shift+J` / `Shift+↓` | next transcript item                                                                     |
+| `Shift+K` / `Shift+↑` | previous transcript item                                                                 |
+| `b` / `PgUp`          | page up                                                                                  |
+| `f` / `PgDn`          | page down                                                                                |
+| `g` / `Home`          | top                                                                                      |
+| `G` / `End`           | bottom                                                                                   |
+| `y` / `c`             | copy selected item or visual selection                                                   |
+| `v`                   | visual cursor / character selection                                                      |
+| `V`                   | line selection                                                                           |
+| `Enter`               | open the first link in the selected item; in visual mode, open the link under the cursor |
+| `:`                   | open EX mode when using `pi-vim`                                                         |
+| `Ctrl+O`              | toggle tool output                                                                       |
+| `Ctrl+T`              | toggle thinking visibility                                                               |
+| `Ctrl+C`              | return to editor focus                                                                   |
+| `Ctrl+D`              | shut down Pi                                                                             |
 
 Visual mode supports familiar Vim-style navigation including `h/j/k/l`, word motions, counts, `f/F/t/T`, `gg/G`, paragraph motions and common text objects such as `iw`, `aw` and quoted/bracketed selections.
 
@@ -77,18 +81,23 @@ Optional `pi-vim` integration is tested with `pi-vim` `0.14.2`.
 
 ## Development
 
+From the repository root, `npm run setup` installs both packages' locked dependencies and `npm run check` runs their builds and unit/native/integration suites. The real integration suite also requires `pi`, `tmux`, `nvim` and `typescript-language-server` on `PATH`.
+
+Inside this package:
+
 ```sh
 npm ci
 npm run typecheck
 npm test
 npm pack --dry-run
 ```
-## Optional native Pi IntelliSense bridge (source checkout)
 
-The source checkout on GitHub main includes an experimental, session-scoped Pi event-bus bridge for [pi-intellisense](https://github.com/philvernon/pi-intellisense). The original transcript remains owned by pi-tab-focus. While its visual cursor is active on code, `K` delegates hover and `gd` delegates definition; item-level uppercase `K`, all legacy motions and yank remain unchanged.
+## Native Pi IntelliSense bridge
+
+The bundle includes a session-scoped Pi event-bus bridge for [pi-intellisense](../pi-intellisense). The original transcript remains owned by pi-tab-focus. While its visual cursor is active on code, `K` delegates hover and `gd` delegates definition; item-level uppercase `K`, all legacy motions and yank remain unchanged.
 
 The bridge exposes `isCurrent()` on focus snapshots to suppress stale LSP responses after mode/cursor/layout changes. A capturing IntelliSense hover popup uses `Esc` to close and remain in transcript mode, or `Tab` to close and signal `pi-intellisense:return-to-editor:v1`, restoring the prompt editor. Pending `g` prefixes are cleared when leaving visual mode.
 
-The npm release may not yet include this patch; when developing locally, run Pi with `-e /path/to/pi-tab-focus/src/index.ts -e /path/to/pi-intellisense/src/index.ts` and avoid loading a second installed copy of the tab-focus extension. The integration does not enable semantic mapping by itself: use the pi-intellisense provider/provenance configuration and see its docs.
+The root package manifest loads both extensions. Do not load the standalone npm release or individual extension paths alongside it. See the bundled [IntelliSense setup and source-mapping limits](../pi-intellisense/README.md).
 
 The bridge dispatch and focus transitions are covered by local automated tests, but its long wrapped-code and full Sidekick/tmux integration remain areas for further testing.

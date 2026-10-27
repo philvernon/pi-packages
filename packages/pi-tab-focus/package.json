@@ -20,12 +20,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/philvernon/pi-tab-focus.git"
+    "url": "git+https://github.com/philvernon/pi-packages.git",
+    "directory": "packages/pi-tab-focus"
   },
   "bugs": {
-    "url": "https://github.com/philvernon/pi-tab-focus/issues"
+    "url": "https://github.com/philvernon/pi-packages/issues"
   },
-  "homepage": "https://github.com/philvernon/pi-tab-focus#readme",
+  "homepage": "https://github.com/philvernon/pi-packages/tree/main/packages/pi-tab-focus#readme",
   "engines": {
     "node": ">=22.19.0"
   },

@@ -1,0 +1,39 @@
+{
+  "name": "pi-packages",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pi packages for transcript navigation and source-aware IntelliSense",
+  "keywords": [
+    "pi-package"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/philvernon/pi-packages.git"
+  },
+  "files": [
+    "packages"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/pi-tab-focus/src/index.ts",
+      "./packages/pi-intellisense/src/index.ts"
+    ]
+  },
+  "scripts": {
+    "setup": "npm ci --prefix packages/pi-tab-focus && npm ci --prefix packages/pi-intellisense",
+    "typecheck": "npm run typecheck --prefix packages/pi-tab-focus && npm run typecheck --prefix packages/pi-intellisense",
+    "build": "npm run typecheck --prefix packages/pi-tab-focus && npm run build --prefix packages/pi-intellisense",
+    "test": "npm test --prefix packages/pi-tab-focus && npm run test:all --prefix packages/pi-intellisense",
+    "test:integration": "npm run test:integration --prefix packages/pi-intellisense",
+    "test:all": "npm test && npm run test:integration",
+    "check": "npm run build && npm run test:all"
+  }
+}

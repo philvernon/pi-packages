@@ -2,6 +2,11 @@
   "name": "pi-intellisense",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/philvernon/pi-packages.git",
+    "directory": "packages/pi-intellisense"
+  },
   "description": "Source-aware IntelliSense in the Pi transcript, with on-demand Neovim navigation",
   "keywords": [
     "pi-package"
