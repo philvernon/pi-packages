@@ -1,0 +1,46 @@
+{
+  "name": "pi-tab-focus",
+  "keywords": [
+    "pi-package"
+  ],
+  "version": "1.0.2",
+  "description": "Crush-style fullscreen transcript focus mode for Pi",
+  "license": "ISC",
+  "type": "module",
+  "main": "./src/index.ts",
+  "files": [
+    "src/*.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"src/tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run typecheck && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/philvernon/pi-tab-focus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/philvernon/pi-tab-focus/issues"
+  },
+  "homepage": "https://github.com/philvernon/pi-tab-focus#readme",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@earendil-works/pi-tui": "^0.85.1",
+    "typescript": "^6.0.2"
+  }
+}
