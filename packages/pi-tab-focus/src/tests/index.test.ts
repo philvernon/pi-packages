@@ -1813,6 +1813,43 @@ test("intellisense hover Tab event returns to editor and invalidates late source
   h.shutdown();
 });
 
+for (const bridge of [false, true]) {
+  for (const selection of ["cursor", "character", "line"] as const) {
+    test(`g then Escape backs out of ${selection} mode ${bridge ? "with" : "without"} IntelliSense`, () => {
+      const h = createHarness({ initialScrollTop: 0 });
+      h.start();
+      if (bridge) {
+        h.intellisenseEvents.emit("pi-intellisense:register:v1", {
+          sessionId: "pi-session",
+          extensionId: "pi-intellisense",
+          actions: ["hover", "definition"],
+          invoke() { assert.fail("Escape must not dispatch IntelliSense"); },
+        });
+      }
+      h.input("\t");
+      h.input("v");
+      if (selection === "character") h.input("v");
+      else if (selection === "line") h.input("V");
+      h.input("g");
+      h.input("\x1b");
+
+      if (selection !== "cursor") {
+        assert.equal(h.selectionText(), undefined);
+        assert.match(h.statuses.get("pi-tab-focus") ?? "", /^VISUAL NAV/);
+        h.input("g");
+        h.input("\x1b");
+      }
+      assert.match(h.statuses.get("pi-tab-focus") ?? "", /^TRANSCRIPT/);
+      assert.equal(h.focusedComponent, null);
+      h.input("\x1b");
+      assert.equal(h.focusedComponent, h.installedEditor);
+      h.input("x");
+      assert.ok(h.editorInputs.includes("x"));
+      h.shutdown();
+    });
+  }
+}
+
 test("leaving transcript clears pending IntelliSense g prefix on next entry", async () => {
   const h=createHarness();
   const calls: string[]=[];

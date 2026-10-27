@@ -218,6 +218,14 @@ for (const kind of ["annotated", "read", "read-quote", "workspace"])
       assert.ok(!screen.includes('source="'), "metadata must not be visible");
       await tmux("send-keys", "-t", pane, "Tab");
       await delay(100);
+      await tmux("send-keys", "-t", pane, "v", "g", "Escape");
+      await delay(100);
+      screen = (await tmux("capture-pane", "-p", "-t", pane)).stdout;
+      assert.match(
+        screen.split("\n").slice(-7).join("\n"),
+        /TRANSCRIPT/,
+        "g then Escape must leave visual navigation in the real bundle\n" + screen,
+      );
       const codeRow = screen
         .split("\n")
         .findIndex((line) =>

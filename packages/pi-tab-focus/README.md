@@ -4,13 +4,32 @@ Crush-style transcript focus mode for Pi. Navigate, select and copy transcript c
 
 ## Install
 
-This repository bundles `pi-tab-focus` and `pi-intellisense`. Before switching, disable the old `npm:pi-tab-focus` entry and standalone local copies in `pi config`, and stop passing their `-e` flags. Loading both creates independent focus owners.
+This repository bundles `pi-tab-focus` and `pi-intellisense`. Use only one installed source: installing the bundle does not replace standalone npm or local copies.
+
+If the standalone npm package is installed, remove it first:
+
+```sh
+pi uninstall npm:pi-tab-focus
+```
+
+Remove standalone local entries with `pi uninstall /path/to/pi-tab-focus` and `pi uninstall /path/to/pi-intellisense`, or disable them in `pi config`. Stop passing the old `-e` flags; they add extensions rather than replacing installed ones.
+
+Install the bundle once:
 
 ```sh
 pi install git:github.com/philvernon/pi-packages
 ```
 
-For local development, install `/path/to/pi-packages` instead of the GitHub source. Enable only one source; neither extension needs a separate `-e` entry. IntelliSense requires Pi **1.3.0** and a language server; see its [setup](../pi-intellisense/README.md#setup).
+To switch an installed GitHub bundle to a local checkout, replace its source:
+
+```sh
+pi uninstall git:github.com/philvernon/pi-packages
+pi install /path/to/pi-packages
+```
+
+Do not enable the GitHub and local sources together or add separate `-e` entries for either extension. Restart Pi without the old flags after switching. Loading two copies creates independent focus owners.
+
+IntelliSense requires Pi **1.3.0** and a language server; see its [setup](../pi-intellisense/README.md#setup).
 
 Run Pi in fullscreen mode:
 

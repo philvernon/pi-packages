@@ -975,29 +975,19 @@ export default function transcriptFocus(
             updateStatus();
             return true;
           }
-          // Feed both keys into the original Vim grammar for gg/ge/gE and
-          // any other motions without losing its pending state.
+          // Replay the intercepted prefix through the original Vim grammar.
           visualNavigation.handleKey("g", visualTextSource);
-          const result = visualNavigation.handleKey(semanticKey, visualTextSource);
-          if (result.command === "copy") copyVisualSelection();
-          else syncVisualNavigation(before);
-          return true;
-        }
-        if (semanticKey === "g") {
+        } else if (semanticKey === "g") {
           intellisensePending = true;
           updateStatus();
           return true;
-        }
-        if (semanticKey === "K" && handler.actions.includes("hover")) {
+        } else if (semanticKey === "K" && handler.actions.includes("hover")) {
           emitIntelliSense("hover");
           return true;
         }
       }
       if (intellisensePending) intellisensePending = false;
-      const result = visualNavigation.handleKey(
-        normalizeVisualKey(data),
-        visualTextSource,
-      );
+      const result = visualNavigation.handleKey(semanticKey, visualTextSource);
       if (!result.handled) {
         updateStatus();
         return false;

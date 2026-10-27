@@ -8,7 +8,13 @@ Language-server hover and source navigation in the existing Pi transcript. With 
 
 Requires Node **22.19+**, Pi **1.3.0** and a language server. The [pi-packages repository](https://github.com/philvernon/pi-packages) bundles this extension with its source-aware `pi-tab-focus` bridge.
 
-Before switching, disable the old `npm:pi-tab-focus` entry and any standalone local copies in `pi config`, and stop passing their `-e` flags. Installing the bundle does not disable other sources; loading both creates two independent transcript focus owners.
+Installing the bundle does not replace standalone npm or local copies. If the standalone focus package is installed, remove it first:
+
+```sh
+pi uninstall npm:pi-tab-focus
+```
+
+Remove old local entries with `pi uninstall /path/to/pi-tab-focus` and `pi uninstall /path/to/pi-intellisense`, or disable them in `pi config`. Stop passing their `-e` flags: those flags add extensions rather than replacing installed ones.
 
 Install the bundle once:
 
@@ -16,7 +22,14 @@ Install the bundle once:
 pi install git:github.com/philvernon/pi-packages
 ```
 
-For local development, use `pi install /path/to/pi-packages` instead of the GitHub source. Do not enable both sources or add separate `-e` entries for either extension. If using `pi-vim`, keep it before the bundle in your package settings.
+For local development, replace the installed GitHub source rather than adding another source:
+
+```sh
+pi uninstall git:github.com/philvernon/pi-packages
+pi install /path/to/pi-packages
+```
+
+Do not enable both sources or add separate `-e` entries for either extension; that creates independent transcript focus owners. Restart Pi without the old flags after switching. If using `pi-vim`, keep it before the bundle in your package settings.
 
 Run normal Pi in fullscreen mode inside tmux. No wrapper or prestarted Neovim is required. Outside tmux, configure an existing Neovim socket. The extension itself does not install software or modify global configuration.
 
